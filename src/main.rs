@@ -2,7 +2,7 @@ use clap::Parser;
 use std::fs;
 use pg_query;
 use postgres::types::Oid;
-use postgres::{Config, NoTls};
+use postgres::{Config, NoTls, SimpleQueryMessage};
 use anyhow::anyhow;
 use anyhow::Result;
 use regex::Regex;
@@ -196,7 +196,7 @@ struct IndexSelectionModelOptions {
     rules: Option<IndexSelectionModelRules>,
 }
 
-fn generic_explain(client: &mut postgres::Client, query_text: &str) -> Result<String> {
+fn generic_explain_fallback(client: &mut postgres::Client, query_text: &str) -> Result<String> {
     let orig_stmt = pg_query::parse(query_text)?;
     for stmt_type in orig_stmt.statement_types() {
         match stmt_type {
@@ -246,6 +246,33 @@ fn generic_explain(client: &mut postgres::Client, query_text: &str) -> Result<St
     client.execute("DEALLOCATE generic_explain", &[])?;
 
     Ok(plan.to_string())
+}
+
+fn generic_explain(client: &mut postgres::Client, query_text: &str) -> Result<String> {
+    let orig_stmt = pg_query::parse(query_text)?;
+    for stmt_type in orig_stmt.statement_types() {
+        match stmt_type {
+            "InsertStmt" => {}
+            "DeleteStmt" => {}
+            "UpdateStmt" => {}
+            "SelectStmt" => {}
+            _ => { return Ok("Utility Statement".to_string()) }
+        }
+    }
+    let explain_stmt = format!("EXPLAIN (GENERIC_PLAN, VERBOSE, FORMAT JSON) {}", query_text);
+    let result = client.simple_query(&explain_stmt)?;
+    let mut out: String = Default::default();
+    for r in result {
+        match r {
+            SimpleQueryMessage::Row(row) => {
+                out.push_str(row.get(0).unwrap());
+                out.push_str("\n");
+            }
+            SimpleQueryMessage::CommandComplete(_) => {}
+            _ => {}
+        }
+    }
+    Ok(out)
 }
 
 fn generic_explain_without_index_scans(client: &mut postgres::Client, query_text: &str) -> Result<String> {
@@ -834,7 +861,10 @@ fn check(client: &mut postgres::Client, queries: Vec<Query>, settings: &IndexSel
                     plan: plan
                 })
             }
-            Err(_) => {
+            Err(err) => {
+                if verbose {
+                    println!("Error running generic EXPLAIN: {}", err);
+                }
                 continue;
             }
         }
