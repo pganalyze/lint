@@ -4,14 +4,14 @@ use pg_query;
 use postgres::types::Oid;
 use postgres::{Config, NoTls};
 use anyhow::anyhow;
-use anyhow::{Result};
+use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use std::collections::HashSet;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::{collections::{HashMap}, sync::atomic::{AtomicUsize, Ordering}};
+use std::{collections::HashMap, sync::atomic::{AtomicUsize, Ordering}};
 use std::io::Write;
 
 #[derive(Parser, Debug)]
@@ -170,8 +170,8 @@ struct IndexSelectionModelOutput {
 struct IndexSelectionModelGoal {
     #[serde(rename="Name")]
     name: String,
-    #[serde(rename="Strictness", skip_serializing_if = "Option::is_none")]
-    strictness: Option<f32>,
+    #[serde(rename="Tolerance", skip_serializing_if = "Option::is_none")]
+    tolerance: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +184,12 @@ struct IndexSelectionModelRules {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct IndexSelectionModelSettings {
+    #[serde(rename="Options")]
+    options: IndexSelectionModelOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct IndexSelectionModelOptions {
     #[serde(rename="Goals")]
     goals: Vec<IndexSelectionModelGoal>,
     #[serde(rename="Rules", skip_serializing_if = "Option::is_none")]
@@ -805,6 +811,11 @@ fn select_indexes(input: &IndexSelectionModelInput, settings: &IndexSelectionMod
 
 fn check(client: &mut postgres::Client, queries: Vec<Query>, settings: &IndexSelectionModelSettings, filter_table: Option<String>, verbose: bool) -> Vec<IndexInfo> {
     if verbose {
+        println!("## Creating necessary extensions, if not already existing");
+    }
+    client.execute("CREATE EXTENSION IF NOT EXISTS hypopg", &[]).unwrap();
+
+    if verbose {
         println!("## Gathering generic EXPLAIN plans to identify scans");
     }
 
@@ -936,17 +947,19 @@ fn main() {
 
             // Default settings
             let mut s = IndexSelectionModelSettings {
-                goals: vec![
-                    IndexSelectionModelGoal {
-                        name: "Minimal Cost".to_string(),
-                        strictness: Some(0.9),
-                    },
-                    IndexSelectionModelGoal {
-                        name: "Minimal Indexes".to_string(),
-                        strictness: None,
-                    }
-                ],
-                rules: None
+                options: IndexSelectionModelOptions {
+                    goals: vec![
+                        IndexSelectionModelGoal {
+                            name: "Minimize Total Cost".to_string(),
+                            tolerance: Some(0.1),
+                        },
+                        IndexSelectionModelGoal {
+                            name: "Minimize Number of Indexes".to_string(),
+                            tolerance: None,
+                        }
+                    ],
+                    rules: None
+                }
             };
             if Path::new(&settings).exists() {
                 let yaml = fs::read_to_string(&settings).expect(&format!("Unexpected error reading settings file: {}", settings));
