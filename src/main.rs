@@ -450,7 +450,7 @@ fn scans_from_plan(client: &mut postgres::Client, plan: QueryWithPlan) -> Result
                 let plans: Vec<&Value> = plans.iter().filter_map(|p| {
                     let node_type = p.get("Node Type").and_then(|v| v.as_str()).expect("");
                     // TODO: Should we be checking the nodes that have Alias fields, vs the ones that do not?
-                    if node_type == "CTE Scan" || node_type == "Hash Join" || node_type == "Merge Join" || node_type == "Nested Loop" {
+                    if node_type == "CTE Scan" || node_type == "Hash Join" || node_type == "Merge Join" || node_type == "Nested Loop" || node_type == "Result" || node_type == "Append" {
                         None
                     } else {
                         Some(p)
@@ -555,7 +555,10 @@ fn scans_from_plan(client: &mut postgres::Client, plan: QueryWithPlan) -> Result
                     // This code path is reached in the second case. Workaround by mapping to the table pointed to by the
                     // unnumbered alias ("tbl"), which should be correct in most practical cases.
                     if let Some(c) = alias_regexp.captures(&table_alias) {
-                        table_name = c.get(1).map(|m| m.as_str() ).map(|a| alias_to_rel.get(a).expect(&format!("Could not find table for simplified Alias: {}", a)).as_str() );
+                        let name = c.get(1).map(|m| m.as_str() );
+                        if name != Some("*VALUES*") {
+                            table_name = name.map(|a| alias_to_rel.get(a).expect(&format!("Could not find table for simplified Alias: {}", a)).as_str() );
+                        }
                     }
                 }
                 if let Some(t) = table_name {
@@ -843,7 +846,7 @@ fn check(client: &mut postgres::Client, queries: Vec<Query>, settings: &IndexSel
     client.execute("CREATE EXTENSION IF NOT EXISTS hypopg", &[]).unwrap();
 
     if verbose {
-        println!("## Gathering generic EXPLAIN plans to identify scans");
+        println!("## Gathering generic EXPLAIN plans to identify scans for {} queries", queries.len());
     }
 
     let mut plans = vec![];
