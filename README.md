@@ -90,26 +90,31 @@ database should be indexed.
 If the file is not present, the following default settings are used:
 
 ```yaml
-Goals:
-  - Name: Minimal Cost
-    Strictness: 0.90
-  - Name: Minimal Indexes
+Method: CP-2024-04
+Options:
+  Goals:
+    - Name: Minimize Total Cost
+      Tolerance: 0.10
+    - Name: Minimal Number Of Indexes
 ```
 
 In addition to goals, you can also specify rules that are hard requirements for the solution, like this:
 
 ```yaml
-Goals:
-  - Name: Minimal Cost
-    Strictness: 1.0
-  - Name: Minimal Indexes
-Rules:
-  Maximum Number of Possible Indexes: 1
+Method: CP-2024-04
+Options:
+  Goals:
+    - Name: Minimize Total Cost
+      Tolerance: 0.10
+    - Name: Minimal Number Of Indexes
+  Rules:
+    - Name: Maximum Number of Possible Indexes
+      Value: 1
 ```
 
 (this would enforce that only one index will be reported as missing, and it will be the one which creates the least overall cost)
 
-See the [model documentation](https://github.com/pganalyze/pgcon2023/#settings-goals-and-rules) for more details on available options.
+See the [model documentation](https://github.com/pganalyze/pgday-chicago-2024/?tab=readme-ov-file#settings-goals-and-rules) for more details on available options.
 
 
 ## Limitations
@@ -131,4 +136,4 @@ See the [model documentation](https://github.com/pganalyze/pgcon2023/#settings-g
 
 This repository is licensed under the 3-clause BSD license, see LICENSE file for details.
 
-Copyright (c) 2023, Duboce Labs, Inc. (pganalyze)
+Copyright (c) 2024, Duboce Labs, Inc. (pganalyze)
