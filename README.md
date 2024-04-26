@@ -14,7 +14,7 @@ scans for each table, determines possible indexing combinations as well as their
 utilizes [HypoPG](https://github.com/HypoPG/hypopg) to get the cost for each scan / index combination.
 
 Finally, the scans, possible indexes, and the costs, are passed to
-[the Index Selection model](https://github.com/pganalyze/pgcon2023). The result of the model is a list
+[the Index Selection model](https://github.com/pganalyze/pgday-chicago-2024). The result of the model is a list
 of missing indexes, as determined by the workload represented by the local pg_stat_statements run.
 
 **We do not recommend using this on a production database** due to the reliance on pg_stat_statements_reset()
